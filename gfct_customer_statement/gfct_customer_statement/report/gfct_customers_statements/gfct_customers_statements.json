@@ -6,7 +6,7 @@
  "docstatus": 0,
  "doctype": "Report",
  "filters": [],
- "is_standard": "No",
+ "is_standard": "Yes",
  "letterhead": null,
  "module": "Gfct Customer Statement",
  "name": "GFCT Customers Statements",
