@@ -1,0 +1,6 @@
+app_name = "gfct_customer_statement"
+app_title = "Gfct Customer Statement"
+app_publisher = "GFCT"
+app_description = "GFCT Customer Statement Report"
+app_email = "info@gfct.ae"
+app_license = "MIT"

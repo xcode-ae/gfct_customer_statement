@@ -1,0 +1,2 @@
+include requirements.txt
+recursive-include gfct_customer_statement *.json *.js *.css *.html *.png *.svg *.txt
