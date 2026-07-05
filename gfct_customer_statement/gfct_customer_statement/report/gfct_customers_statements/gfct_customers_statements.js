@@ -184,7 +184,7 @@ frappe.query_reports["GFCT Customers Statements"] = {
 
 				// Report title header (repeats on each customer page)
 				html += `<div class="rpt-title">
-  <h3>GFCT Customers Statement</h3>
+  <h3>Customers Statement</h3>
   <p>${company}${from_d ? " &nbsp;|&nbsp; " + from_d + " to " + to_d : ""}</p>
 </div>`;
 
