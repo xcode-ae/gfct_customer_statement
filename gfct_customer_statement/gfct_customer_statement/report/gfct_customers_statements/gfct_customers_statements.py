@@ -36,6 +36,12 @@ def execute(filters=None):
 	# 5. All customers = union of opening balance, invoices, pay entries
 	all_customers = sorted(set(list(by_customer.keys()) + list(opening_map.keys())))
 
+	# 5a. PDC rows grouped by customer (shown inline after each customer's closing balance)
+	pdc_rows = get_pending_pdc(filters)
+	pdc_by_customer = {}
+	for pdc in pdc_rows:
+		pdc_by_customer.setdefault(pdc["customer"], []).append(pdc)
+
 	# 6. Build per-customer blocks
 	for customer in all_customers:
 		rows = by_customer.get(customer, [])
@@ -110,36 +116,23 @@ def execute(filters=None):
 			"indent": 1,
 		})
 
-	# 6. Pending PDC section at the very end of the table
-	pdc_rows = get_pending_pdc(filters)
-	if pdc_rows:
-		# Section header
-		data.append({
-			"ref_inv": "Pending PDC Cheques (Not Deposited)",
-			"bold": 1,
-			"indent": 0,
-		})
-
-		pdc_running = 0.0
-		for pdc in pdc_rows:
-			pdc_running += flt(pdc["amount"])
+		# PDC rows for this customer (shown right after closing balance)
+		cust_pdcs = pdc_by_customer.get(customer, [])
+		if cust_pdcs:
 			data.append({
-				"customer": pdc["customer"],
-				"date": pdc["reference_date"],
-				"ref_inv": pdc["reference_no"] or "",
-				"outstanding": flt(pdc["amount"]),
-				"balance": pdc_running,
+				"ref_inv": "Pending PDC Cheques (Not Deposited)",
+				"bold": 1,
 				"indent": 1,
 			})
-
-		# PDC total row
-		data.append({
-			"ref_inv": "Total Pending PDC",
-			"outstanding": pdc_running,
-			"balance": pdc_running,
-			"bold": 1,
-			"indent": 0,
-		})
+			for pdc in cust_pdcs:
+				data.append({
+					"date": pdc["reference_date"],
+					"ref_inv": pdc["reference_no"] or "",
+					"po_no": "PDC",
+					"outstanding": flt(pdc["amount"]),
+					"balance": "",
+					"indent": 1,
+				})
 
 	return columns, data
 
