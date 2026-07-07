@@ -271,7 +271,7 @@ def get_opening_balance(filters):
 
 	recv_query = """
 		SELECT ple.party AS customer, SUM(ple.amount) AS opening
-		FROL `tabPayment Entry` pe
+		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.voucher_no = pe.name
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no
