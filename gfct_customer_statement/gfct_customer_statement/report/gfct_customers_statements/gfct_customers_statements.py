@@ -271,7 +271,7 @@ def get_opening_balance(filters):
 
 	recv_query = """
 		SELECT ple.party AS customer, SUM(ple.amount) AS opening
-		FROM `tabPayment Entry` pe
+		FROL `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.voucher_no = pe.name
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no
@@ -450,7 +450,7 @@ def get_pending_pdc(filters):
 
 	Notes:
 	- reconcelled = 0  means pending  (field name has a typo — double-l, intentional)
-	- Use pcr.total_paid, NOT pcr.allocated_amount (allocated_amount is always 0 for pending cheques)
+	- Use pdc.amount (full cheque amount), NOT pcr.total_paid (per-customer allocated portion)
 	"""
 	conditions = [
 		"pdc.docstatus = 1",
@@ -472,7 +472,7 @@ def get_pending_pdc(filters):
 			pcr.customer_name,
 			pdc.reference_no,
 			pdc.reference_date,
-			pcr.total_paid      AS amount
+			pdc.amount          AS amount
 		FROM `tabPDC Cheque` pdc
 		INNER JOIN `tabPDC Cheque Entry Reference` pcr ON pcr.parent = pdc.name
 		WHERE {conditions}
