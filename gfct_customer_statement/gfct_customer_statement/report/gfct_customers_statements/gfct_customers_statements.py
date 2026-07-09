@@ -42,16 +42,22 @@ def execute(filters=None):
 	for pdc in pdc_rows:
 		pdc_by_customer.setdefault(pdc["customer"], []).append(pdc)
 
+	# 5b. Fetch customer name + group for all customers in one query
+	customer_info = get_customer_info(all_customers)
+
 	# 6. Build per-customer blocks
 	for customer in all_customers:
 		rows = by_customer.get(customer, [])
 		opening = flt(opening_map.get(customer, 0.0))
-		inv_rows = [r for r in rows if r.get("_row_type") == "invoice"]
-		customer_name = inv_rows[0]["customer_name"] if inv_rows else customer
+		cinfo = customer_info.get(customer, {})
+		customer_name = cinfo.get("customer_name") or customer
+		customer_group = cinfo.get("customer_group") or ""
 
 		# Customer header row
 		data.append({
 			"customer": customer,
+			"customer_name": customer_name,
+			"customer_group": customer_group,
 			"ref_inv": customer_name,
 			"bold": 1,
 			"indent": 0,
@@ -147,6 +153,19 @@ def get_columns():
 			"width": 120,
 		},
 		{
+			"label": "Customer Name",
+			"fieldname": "customer_name",
+			"fieldtype": "Data",
+			"width": 180,
+		},
+		{
+			"label": "Customer Group",
+			"fieldname": "customer_group",
+			"fieldtype": "Link",
+			"options": "Customer Group",
+			"width": 140,
+		},
+		{
 			"label": "Date",
 			"fieldname": "date",
 			"fieldtype": "Date",
@@ -183,6 +202,18 @@ def get_columns():
 			"width": 130,
 		},
 	]
+
+
+def get_customer_info(customers):
+	"""Returns {customer_id: {customer_name, customer_group}} for a list of customer IDs."""
+	if not customers:
+		return {}
+	result = frappe.db.sql("""
+		SELECT name, customer_name, customer_group
+		FROM `tabCustomer`
+		WHERE name IN %(customers)s
+	""", {"customers": tuple(customers)}, as_dict=True)
+	return {r["name"]: r for r in result}
 
 
 def get_opening_balance(filters):
@@ -237,11 +268,14 @@ def get_opening_balance(filters):
 		pe_conditions.append("pe.company = %(company)s")
 	if filters.get("customer"):
 		pe_conditions.append("ple.party = %(customer)s")
+	if filters.get("customer_group"):
+		pe_conditions.append("c.customer_group = %(customer_group)s")
 
 	pe_query = """
 		SELECT ple.party AS customer, SUM(ple.amount) AS opening
 		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.against_voucher_no = pe.name
+		LEFT JOIN `tabCustomer` c ON c.name = ple.party
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no
 		HAVING SUM(ple.amount) > 0
@@ -268,11 +302,14 @@ def get_opening_balance(filters):
 		recv_conditions.append("pe.company = %(company)s")
 	if filters.get("customer"):
 		recv_conditions.append("ple.party = %(customer)s")
+	if filters.get("customer_group"):
+		recv_conditions.append("c.customer_group = %(customer_group)s")
 
 	recv_query = """
 		SELECT ple.party AS customer, SUM(ple.amount) AS opening
 		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.voucher_no = pe.name
+		LEFT JOIN `tabCustomer` c ON c.name = ple.party
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no
 		HAVING SUM(ple.amount) < 0
@@ -370,6 +407,10 @@ def get_pay_entries(filters):
 		conditions.append("ple.party = %(customer)s")
 		values["customer"] = filters.customer
 
+	if filters.get("customer_group"):
+		conditions.append("c.customer_group = %(customer_group)s")
+		values["customer_group"] = filters.customer_group
+
 	query = """
 		SELECT
 			ple.party           AS customer,
@@ -378,6 +419,7 @@ def get_pay_entries(filters):
 			SUM(ple.amount)     AS outstanding_amount
 		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.against_voucher_no = pe.name
+		LEFT JOIN `tabCustomer` c ON c.name = ple.party
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no, pe.posting_date
 		HAVING SUM(ple.amount) > 0
@@ -426,6 +468,10 @@ def get_receive_advances(filters):
 		conditions.append("ple.party = %(customer)s")
 		values["customer"] = filters.customer
 
+	if filters.get("customer_group"):
+		conditions.append("c.customer_group = %(customer_group)s")
+		values["customer_group"] = filters.customer_group
+
 	query = """
 		SELECT
 			ple.party               AS customer,
@@ -434,6 +480,7 @@ def get_receive_advances(filters):
 			SUM(ple.amount)         AS outstanding_amount
 		FROM `tabPayment Entry` pe
 		INNER JOIN `tabPayment Ledger Entry` ple ON ple.voucher_no = pe.name
+		LEFT JOIN `tabCustomer` c ON c.name = ple.party
 		WHERE {conditions}
 		GROUP BY ple.party, ple.against_voucher_no, pe.posting_date
 		HAVING SUM(ple.amount) < 0
@@ -466,6 +513,10 @@ def get_pending_pdc(filters):
 		conditions.append("pcr.party = %(customer)s")
 		values["customer"] = filters.customer
 
+	if filters.get("customer_group"):
+		conditions.append("c.customer_group = %(customer_group)s")
+		values["customer_group"] = filters.customer_group
+
 	query = """
 		SELECT
 			pcr.party           AS customer,
@@ -475,6 +526,7 @@ def get_pending_pdc(filters):
 			pdc.amount          AS amount
 		FROM `tabPDC Cheque` pdc
 		INNER JOIN `tabPDC Cheque Entry Reference` pcr ON pcr.parent = pdc.name
+		LEFT JOIN `tabCustomer` c ON c.name = pcr.party
 		WHERE {conditions}
 		ORDER BY pcr.party, pdc.reference_date, pdc.name
 	""".format(conditions=" AND ".join(conditions))
